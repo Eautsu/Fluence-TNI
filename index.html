@@ -1,0 +1,814 @@
+<!doctype html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Fluence TNI</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Andika:wght@400;700&family=Playwrite+FR+Moderne:wght@300;400&family=Fredoka:wght@500;600&display=swap">
+<style>
+/* Layout: a large "tableau" stage on top, a compact control bench below; stage can go fullscreen for the TNI */
+:root{
+  --bg:#eef1ee; --panel:#ffffff; --fg:#1d2a24; --muted:#5d6b64; --line:#d3dbd6;
+  --accent:#1f6f54; --accent-fg:#ffffff;
+  --board:#20372e; --board-edge:#4a3a2a; --chalk:#f6f7f2;
+  --font-ui:"Fredoka","Andika",system-ui,sans-serif;
+  --font-read:"Andika","Comic Sans MS",system-ui,sans-serif;
+  --font-cursive:"Playwrite FR Moderne","Andika",cursive;
+}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){
+  --bg:#131a17; --panel:#1b2420; --fg:#e7ede9; --muted:#9aa8a1; --line:#2e3a35;
+  --accent:#4fbf93; --accent-fg:#0d1512; --board:#18291f; --board-edge:#3a2e22; color-scheme:dark}}
+:root[data-theme="dark"]{
+  --bg:#131a17; --panel:#1b2420; --fg:#e7ede9; --muted:#9aa8a1; --line:#2e3a35;
+  --accent:#4fbf93; --accent-fg:#0d1512; --board:#18291f; --board-edge:#3a2e22; color-scheme:dark}
+html,body{height:100%}
+body{background:var(--bg);color:var(--fg);font-family:var(--font-ui);
+  padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px));padding-block:16px;box-sizing:border-box}
+*{box-sizing:border-box}
+[hidden]{display:none!important}
+.wrap{max-width:1200px;margin:0 auto;display:flex;flex-direction:column;gap:14px}
+header{display:flex;align-items:baseline;justify-content:space-between;gap:12px;flex-wrap:wrap}
+h1{font-size:1.5rem;margin:0;font-weight:600;text-wrap:balance}
+h1 small{font-weight:500;color:var(--muted);font-size:.95rem;margin-left:8px}
+.badge{display:inline-block;margin-left:10px;padding:2px 10px;border-radius:999px;font-size:.8rem;font-weight:600;vertical-align:middle;border:1px solid var(--accent);color:var(--accent)}
+.badge.classe{border-color:#b4442f;color:#b4442f}
+.badge:empty{display:none}
+.count{color:var(--muted);font-variant-numeric:tabular-nums}
+.head-right{display:flex;align-items:center;gap:14px}
+#helpBtn{border:1px solid var(--accent);color:var(--accent);background:var(--panel);border-radius:999px;padding:6px 16px;font-weight:600;cursor:pointer}
+#helpBtn:hover{background:var(--accent);color:var(--accent-fg)}
+dialog#help{width:min(760px,calc(100vw - 32px));max-height:calc(100vh - 48px);padding:0;border:1px solid var(--line);border-radius:14px;background:var(--panel);color:var(--fg);box-shadow:0 20px 60px rgba(0,0,0,.35)}
+dialog#help::backdrop{background:rgba(10,20,15,.55)}
+.help-head{display:flex;justify-content:space-between;align-items:center;gap:12px;padding:14px 20px;border-bottom:1px solid var(--line);position:sticky;top:0;background:var(--panel)}
+.help-head h2{margin:0;font-size:1.3rem}
+.help-body{padding:6px 20px 22px;overflow:auto;max-height:calc(100vh - 120px);font-family:var(--font-read);line-height:1.5}
+.help-toc{display:flex;flex-wrap:wrap;gap:6px;padding:10px 0 4px}
+.help-toc a{font-family:var(--font-ui);font-size:.9rem;padding:3px 10px;border-radius:999px;background:var(--bg);color:var(--fg);text-decoration:none;border:1px solid var(--line)}
+.help-toc a:hover{border-color:var(--accent);color:var(--accent)}
+.help-body h3{font-family:var(--font-ui);color:var(--accent);margin:18px 0 6px;font-size:1.1rem}
+.help-body ol,.help-body ul{margin:0;padding-left:1.3em;display:flex;flex-direction:column;gap:4px}
+.help-body p{margin:6px 0;max-width:68ch}
+.help-body table{border-collapse:collapse;width:100%;font-size:.95rem;margin:4px 0}
+.help-body th,.help-body td{border:1px solid var(--line);padding:5px 8px;text-align:left;vertical-align:top}
+.help-body th{background:var(--bg);font-family:var(--font-ui)}
+
+/* Stage */
+#stage{position:relative;aspect-ratio:16/9;max-width:100%;width:100%;background:var(--board);
+  border:10px solid var(--board-edge);border-radius:6px;overflow:hidden;cursor:pointer;user-select:none;
+  box-shadow:inset 0 0 80px rgba(0,0,0,.35)}
+#board{display:flex;flex-direction:column;gap:14px;
+  --ink:#f6f7f2; --k-b:#7cc4ff; --k-r:#ff8f86; --k-g:#7f9189; --k-y:#ffd166; --k-v:#9be59b; --k-p:#c9a7ff; --pill:rgba(0,0,0,.3)}
+#board.light{--board:#fbf7ec; --ink:#1b1f1d; --k-b:#1a56c4; --k-r:#c42b22; --k-g:#a3a8a5; --k-y:#a86b00; --k-v:#2f7d32; --k-p:#6a3fb0; --pill:rgba(0,0,0,.08)}
+/* palette pour élève daltonien (protanopie / deutéranopie) : bleu / orange */
+#board.cb{--k-b:#56b4e9; --k-r:#f0a030}
+#board.light.cb{--k-b:#0060a8; --k-r:#c25e00}
+#board.light #stage{box-shadow:inset 0 0 60px rgba(0,0,0,.06)}
+#board:fullscreen{background:var(--board);gap:0;position:relative}
+#board:fullscreen #stage{border:0;border-radius:0;aspect-ratio:auto;width:100vw;height:100vh}
+#board:fullscreen .bar{position:absolute;left:50%;transform:translateX(-50%);width:max-content;max-width:calc(100vw - 32px);bottom:max(18px,env(safe-area-inset-bottom,0px));
+  background:var(--panel);padding:10px 12px;border-radius:14px;box-shadow:0 6px 24px rgba(0,0,0,.25);z-index:5;flex-wrap:nowrap}
+#board:fullscreen.playing .bar{display:none}
+#board:fullscreen .bar button{white-space:nowrap}
+#board:fullscreen.playing #stage{cursor:none}
+.item{position:absolute;transform:translate(-50%,-50%);color:var(--ink);font-family:var(--font-read);
+  font-weight:700;line-height:1;white-space:nowrap;letter-spacing:.02em;
+  transition:opacity .18s ease, transform .18s ease}
+.item.cursive{font-family:var(--font-cursive);font-weight:400;letter-spacing:0}
+.item.hide{opacity:0;transform:translate(-50%,-50%) scale(.92)}
+.item.scroll{transform:translateY(-50%);transition:none;left:0}
+.hint{position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:10px;
+  color:var(--ink);opacity:.85;text-align:center;padding:20px}
+.hint b{font-size:clamp(1.5rem,4.2vw,3rem);font-weight:600}
+.hint span{font-size:clamp(1rem,2.2vw,1.6rem);opacity:.85;max-width:40ch}
+.countdown{font-size:clamp(6rem,24vw,18rem);font-family:var(--font-read);font-weight:700}
+.d-b{color:var(--k-b)}.d-r{color:var(--k-r)}.d-g{color:var(--k-g)}.d-y{color:var(--k-y)}.d-v{color:var(--k-v)}.d-p{color:var(--k-p)}
+.c0{color:var(--k-b)}.c1{color:var(--k-r)}.c2{color:var(--k-y)}.c3{color:var(--k-v)}
+
+/* Controls */
+.bar{display:flex;gap:10px;flex-wrap:wrap;align-items:center}
+button,select,input,textarea{font:inherit;color:var(--fg)}
+button{border:1px solid var(--line);background:var(--panel);border-radius:10px;padding:9px 16px;cursor:pointer;font-weight:500}
+button.primary{background:var(--accent);color:var(--accent-fg);border-color:var(--accent);min-width:130px;font-weight:600}
+button:focus-visible,select:focus-visible,input:focus-visible,textarea:focus-visible{outline:3px solid var(--accent);outline-offset:2px}
+.seg{display:inline-flex;border:1px solid var(--line);border-radius:10px;overflow:hidden}
+.seg button{border:0;border-radius:0;background:var(--panel)}
+.seg button[aria-pressed="true"]{background:var(--accent);color:var(--accent-fg)}
+.panel{background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:16px;
+  display:grid;grid-template-columns:minmax(0,1.1fr) minmax(0,1fr);gap:20px}
+@media (max-width:760px){.panel{grid-template-columns:1fr}}
+.col{display:flex;flex-direction:column;gap:12px;min-width:0}
+label.f{display:flex;flex-direction:column;gap:4px;font-size:.92rem;color:var(--muted)}
+label.f > span{display:flex;justify-content:space-between}
+label.f output{color:var(--fg);font-variant-numeric:tabular-nums;font-weight:600}
+textarea{width:100%;min-height:150px;border:1px solid var(--line);border-radius:10px;background:var(--bg);padding:10px;
+  font-family:var(--font-read);font-size:1.05rem;line-height:1.5;resize:vertical}
+select,input[type=text]{border:1px solid var(--line);border-radius:10px;background:var(--bg);padding:8px 10px}
+input[type=range]{width:100%;accent-color:var(--accent)}
+.row{display:flex;gap:10px;flex-wrap:wrap}
+.row > *{flex:1 1 140px;min-width:0}
+.check{display:flex;gap:8px;align-items:center;font-size:.95rem}
+.check input{accent-color:var(--accent);width:18px;height:18px}
+.small{font-size:.85rem;color:var(--muted)}
+fieldset.gen{border:1px solid var(--line);border-radius:10px;padding:12px;margin:0;display:flex;flex-direction:column;gap:10px;min-width:0}
+fieldset.gen legend{padding:0 6px;font-weight:600;color:var(--accent)}
+fieldset.prep{border-color:var(--accent);border-width:2px}
+.listtools .primary{min-width:0}
+.structs{display:flex;flex-wrap:wrap;gap:6px 16px}
+.structs em{font-family:var(--font-read);font-style:normal;color:var(--muted)}
+.gen-go{align-items:flex-end}
+.gen-go button{flex:0 0 auto}
+.hud{position:absolute;top:0;left:0;right:0;display:flex;justify-content:space-between;align-items:center;
+  padding:10px 16px;color:var(--ink);font-family:var(--font-read);font-weight:700;font-variant-numeric:tabular-nums;pointer-events:none;z-index:2}
+.hud .pill{background:var(--pill);border-radius:999px;padding:6px 18px;font-size:clamp(1.2rem,3.4vw,2.6rem)}
+.hud .pill.low{color:var(--k-y)}
+.item.ok{opacity:.55}
+.item.bad{opacity:.55}
+.item.bad::after{content:"✗";position:absolute;right:-.6em;top:-.35em;font-size:.4em;color:var(--k-r)}
+.item.ok::after{content:"✓";position:absolute;right:-.6em;top:-.35em;font-size:.4em;color:var(--k-v)}
+.score{display:flex;flex-direction:column;align-items:center;gap:6px}
+.score .big{font-size:clamp(5rem,20vw,14rem);font-family:var(--font-read);font-weight:700;line-height:1;color:var(--k-y)}
+.score .what{font-size:clamp(1.4rem,4vw,3rem);font-weight:600}
+.score .again{margin-top:10px;font-size:clamp(.9rem,1.6vw,1.2rem);opacity:.6}
+.score .detail{font-size:clamp(1.1rem,2.8vw,2rem);opacity:.85}
+.results{background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:16px;display:flex;flex-direction:column;gap:12px}
+.results h2{margin:0;font-size:1.15rem;font-weight:600}
+.results p{margin:0;color:var(--muted)}
+.chips{display:flex;flex-wrap:wrap;gap:6px;max-height:9.5rem;overflow:auto}
+.chip{font-family:var(--font-read);font-size:1.05rem;padding:2px 10px;border-radius:999px;border:1px solid var(--line);background:var(--bg)}
+.chip.miss{color:var(--muted);text-decoration:line-through}
+.chip.err{color:#b4442f;border-color:#b4442f;text-decoration:underline;text-underline-offset:3px}
+.msg{color:var(--accent);font-weight:500;min-height:1.3em}
+.listtools{display:flex;gap:8px;flex-wrap:wrap;align-items:center}
+.listtools input[type=text]{flex:1 1 160px;min-width:0}
+.danger{color:#b4442f}
+.only-flash[hidden],.only-scroll[hidden]{display:none!important}
+@media (prefers-reduced-motion:reduce){.item{transition:none}}
+</style>
+
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <h1>Fluence TNI <small id="subtitle">apparitions</small><span class="badge" id="versionBadge">version en ligne</span></h1>
+    <div class="head-right">
+      <div class="count">Lus : <span id="readHead">0</span></div>
+      <button type="button" id="helpBtn" aria-haspopup="dialog">? Aide</button>
+    </div>
+  </header>
+<dialog id="help" aria-labelledby="helpTitle">
+  <div class="help-head">
+    <h2 id="helpTitle">Aide</h2>
+    <button type="button" id="helpClose" aria-label="Fermer l'aide">✕ Fermer</button>
+  </div>
+  <div class="help-body">
+    <nav class="help-toc" aria-label="Sommaire de l'aide">
+      <a href="#h-demarrer">Démarrer</a><a href="#h-commandes">Commandes</a><a href="#h-listes">Listes</a><a href="#h-reglages">Réglages</a><a href="#h-score">Score</a><a href="#h-classe">En classe</a><a href="#h-problemes">Problèmes</a>
+    </nav>
+
+    <section id="h-demarrer">
+      <h3>Démarrer en 5 étapes</h3>
+      <ol>
+        <li>Choisir une liste dans <b>Série</b>, ou en taper une dans <b>Préparer ma liste</b>.</li>
+        <li>Choisir <b>Défilement</b> ou <b>Apparitions</b>, et le déclenchement <b>Au clic</b>.</li>
+        <li>Cliquer sur <b>Plein écran</b>.</li>
+        <li>Cliquer sur <b>▶ Lancer</b> : compte à rebours 3-2-1, puis la lecture.</li>
+        <li>À la fin du chrono, le score reste affiché. <b>▶ Relancer</b> démarre une nouvelle partie.</li>
+      </ol>
+    </section>
+
+    <section id="h-commandes">
+      <h3>Commandes pendant la partie</h3>
+      <table>
+        <tr><th>Action</th><th>Souris</th><th>Clavier</th></tr>
+        <tr><td>Lancer</td><td>Clic sur le tableau ou ▶ Lancer</td><td>Espace</td></tr>
+        <tr><td>Lu correctement</td><td>Clic gauche</td><td>Espace, Entrée, →</td></tr>
+        <tr><td>Erreur</td><td>Clic droit (appui long sur TNI)</td><td>X, ↓</td></tr>
+        <tr><td>Pause</td><td>❚❚ Pause</td><td>Échap ou P</td></tr>
+        <tr><td>Arrêter et voir le score</td><td>■ Terminer</td><td>—</td></tr>
+        <tr><td>Tout effacer sans jouer</td><td>↺ Remettre à zéro</td><td>—</td></tr>
+      </table>
+      <p>En défilement, le clic ne compte qu'une fois le mot entièrement entré dans l'écran. Un élément non lu à temps part seul et compte comme « pas lu à temps ».</p>
+      <p>En plein écran, les boutons se cachent pendant la lecture et reviennent en pause (Échap) ou à la fin.</p>
+    </section>
+
+    <section id="h-listes">
+      <h3>Préparer et garder ses listes</h3>
+      <ul>
+        <li><b>Taper ou coller</b> une liste : un élément par ligne, ou des syllabes séparées par des espaces. Les groupes comme « un chat » restent entiers.</li>
+        <li><b>Générer</b> une liste : choisir les sons cibles, les structures (CV, CVC…), puis <b>Générer une liste</b>. Relire : le générateur peut produire de vrais mots.</li>
+        <li><b>Enregistrer</b> : donner un nom, puis <b>Enregistrer la liste</b>. Elle apparaît dans <b>Série</b> avec une étoile.</li>
+        <li>Les listes restent dans <b>ce navigateur, sur cet ordinateur</b>. Pour les garder ou changer d'ordinateur : <b>Télécharger (.txt)</b>, puis <b>Ouvrir un .txt</b> ailleurs.</li>
+      </ul>
+    </section>
+
+    <section id="h-reglages">
+      <h3>Réglages utiles</h3>
+      <ul>
+        <li><b>Durée de la traversée</b> : 5 s pour commencer, 8 à 10 s pour des CP.</li>
+        <li><b>Taille</b> : 28 par défaut ; monter si le fond de la classe lit mal.</li>
+        <li><b>Fond du tableau</b> : clair dans une salle éclairée, foncé dans une salle sombre.</li>
+        <li><b>Syllabes colorées</b> : alternance de deux couleurs, comme un document dys. <b>Bleu / orange</b> pour un élève daltonien.</li>
+        <li><b>Lettres en couleur</b> : par exemple « b d » pour travailler une confusion.</li>
+        <li><b>Ordre</b> : « Dans l'ordre » pour une liste construite en progression.</li>
+        <li><b>Reprendre la liste à la fin</b> : à laisser coché avec un chrono.</li>
+      </ul>
+    </section>
+
+    <section id="h-score">
+      <h3>Lire le score</h3>
+      <p>Le grand nombre compte les éléments <b>lus correctement</b>. Dessous : les erreurs, et les éléments pas lus à temps. Sous le tableau, « Dernière partie » rappelle la série : erreurs soulignées en rouge, éléments non lus barrés.</p>
+      <p>Repères de fin d'année (mots correctement lus en 1 minute) : CP 50, CE1 70, CE2 90.</p>
+    </section>
+
+    <section id="h-classe">
+      <h3>Trois façons de jouer en classe</h3>
+      <ul>
+        <li><b>L'enseignant valide</b>, toute la classe lit : idéal pour l'entraînement ; c'est le score du groupe.</li>
+        <li><b>Un élève tiré au sort clique</b> : donner la règle « on clique quand toute la classe a fini de lire ».</li>
+        <li><b>Le furet</b>, un élève à la fois : on entend chacun ; préférer un score d'équipe.</li>
+      </ul>
+      <p>Pour un suivi individuel fiable : l'enseignant clique, un élève seul, 1 minute, même type de liste.</p>
+    </section>
+
+    <section id="h-problemes">
+      <h3>Problèmes fréquents</h3>
+      <table>
+        <tr><th>Problème</th><th>Solution</th></tr>
+        <tr><td>Un clic ne fait rien en défilement</td><td>Attendre que le mot soit entré en entier.</td></tr>
+        <tr><td>Un clic après le score ne relance pas</td><td>C'est voulu : utiliser ▶ Relancer.</td></tr>
+        <tr><td>Pas de clic droit sur le TNI</td><td>Appui long, ou touche X d'un clavier.</td></tr>
+        <tr><td>Espace ne fait rien</td><td>Cliquer d'abord sur le tableau.</td></tr>
+        <tr><td>La partie s'arrête trop tôt</td><td>Cocher « Reprendre la liste à la fin ».</td></tr>
+        <tr><td>Mes listes ont disparu</td><td>Les recharger avec Ouvrir un .txt.</td></tr>
+        <tr><td>Les boutons ont disparu</td><td>Appuyer sur Échap.</td></tr>
+      </table>
+    </section>
+  </div>
+</dialog>
+
+
+  <div id="board">
+  <div id="stage" tabindex="0" aria-label="Zone de lecture. Clic ou Espace : lancer, puis syllabe lue.">
+    <div class="hud" id="hud" hidden><span class="pill" id="hudRead">✓ 0</span><span class="pill" id="hudTime">1:00</span></div>
+    <div class="hint" id="hint"></div>
+  </div>
+
+  <div class="bar">
+    <button class="primary" id="play">▶ Lancer</button>
+    <button id="finish">■ Terminer</button>
+    <button id="reset">↺ Remettre à zéro</button>
+    <button id="fs">⛶ Plein écran</button>
+    <div class="seg" role="group" aria-label="Mode">
+      <button id="mFlash" aria-pressed="true">Apparitions</button>
+      <button id="mScroll" aria-pressed="false">Défilement</button>
+    </div>
+  </div>
+  </div>
+
+  <section class="results" id="results" hidden>
+    <h2>Dernière partie</h2>
+    <p id="resSummary"></p>
+    <div class="chips" id="resChips"></div>
+      </section>
+
+  <div class="panel">
+    <div class="col">
+      <div class="row">
+        <label class="f">Série
+          <select id="preset"></select>
+        </label>
+        <label class="f">Lettres en couleur
+          <input type="text" id="colorLetters" value="b d" placeholder="ex. b d">
+        </label>
+      </div>
+      <fieldset class="gen prep">
+        <legend>Préparer ma liste</legend>
+        <label class="f"><span>Syllabes et mots : un par ligne, ou séparés par des espaces</span>
+          <textarea id="list" spellcheck="false"></textarea>
+        </label>
+        <div class="listtools">
+          <input type="text" id="saveName" placeholder="Nom de la liste" aria-label="Nom de la liste à enregistrer">
+          <button id="saveList" class="primary">Enregistrer la liste</button>
+          <button id="dlList" class="dl">Télécharger (.txt)</button>
+          <button id="openFile" class="dl">Ouvrir un .txt</button>
+          <input type="file" id="fileIn" accept=".txt,text/plain" hidden>
+          <button id="delList" class="danger" hidden>Supprimer cette liste</button>
+        </div>
+        <div class="msg" id="listMsg" role="status"></div>
+        <div class="small">Tape ou génère ta liste, donne-lui un nom, enregistre. Le jour J, choisis-la dans « Série » : elle est prête.</div>
+      </fieldset>
+      <fieldset class="gen">
+        <legend>Générateur</legend>
+        <div class="row">
+          <label class="f">Lettres ou sons cibles
+            <input type="text" id="gTargets" value="b d" placeholder="ex. b d  ou  on an"></label>
+          <label class="f">Consonnes autour
+            <input type="text" id="gCons" value="r l m n t p f"></label>
+        </div>
+        <label class="f">Voyelles et sons voyelles
+          <input type="text" id="gVow" value="a e é i o u ou on oi"></label>
+        <div class="structs" role="group" aria-label="Structures">
+          <label class="check"><input type="checkbox" value="CV" checked> CV <em>ba</em></label>
+          <label class="check"><input type="checkbox" value="VC"> VC <em>ad</em></label>
+          <label class="check"><input type="checkbox" value="CVC" checked> CVC <em>mol</em></label>
+          <label class="check"><input type="checkbox" value="CCV" checked> CCV <em>pla</em></label>
+          <label class="check"><input type="checkbox" value="M2" checked> 2 syllabes <em>tima</em></label>
+          <label class="check"><input type="checkbox" value="M3" checked> 3 syllabes <em>lomira</em></label>
+        </div>
+        <div class="row gen-go">
+          <label class="f"><span>Nombre d'éléments <output id="oNb"></output></span>
+            <input type="range" id="gNb" min="8" max="60" step="1" value="24"></label>
+          <button id="gen" type="button">✦ Générer une liste</button>
+        </div>
+        <label class="check"><input type="checkbox" id="gAuto"> Nouvelle liste à chaque partie</label>
+      </fieldset>
+    </div>
+
+    <div class="col">
+      <div class="row">
+        <label class="f">Déclenchement
+          <select id="trigger">
+            <option value="click">Au clic (lu → suivante)</option>
+            <option value="auto">Automatique (au rythme réglé)</option>
+          </select>
+        </label>
+        <label class="f">Temps de la partie
+          <select id="chrono">
+            <option value="0">Sans limite</option>
+            <option value="30">30 s</option>
+            <option value="60" selected>1 min</option>
+            <option value="90">1 min 30</option>
+            <option value="120">2 min</option>
+            <option value="180">3 min</option>
+          </select>
+        </label>
+      </div>
+      <label class="f only-flash"><span id="lShow">Temps d'affichage maximum <output id="oShow"></output></span>
+        <input type="range" id="show" min="0.3" max="8" step="0.1" value="3"></label>
+      <label class="f only-flash"><span>Pause entre deux <output id="oGap"></output></span>
+        <input type="range" id="gap" min="0" max="3" step="0.1" value="0.3"></label>
+      <label class="f only-scroll" hidden><span>Durée de la traversée <output id="oCross"></output></span>
+        <input type="range" id="cross" min="1.5" max="12" step="0.5" value="5"></label>
+      <label class="f"><span>Taille <output id="oSize"></output></span>
+        <input type="range" id="size" min="10" max="45" step="1" value="28"></label>
+      <div class="row">
+        <label class="f">Écriture
+          <select id="font">
+            <option value="script">Script</option>
+            <option value="cursive">Cursive</option>
+            <option value="upper">Majuscules</option>
+          </select>
+        </label>
+        <label class="f">Ordre
+          <select id="order">
+            <option value="random">Au hasard</option>
+            <option value="list">Dans l'ordre</option>
+          </select>
+        </label>
+      </div>
+      <label class="check only-flash"><input type="checkbox" id="spread" checked> Partout sur l'écran (sinon au centre)</label>
+      <label class="f">Fond du tableau
+        <select id="boardBg">
+          <option value="dark">Foncé, écriture claire</option>
+          <option value="light">Clair, écriture foncée</option>
+        </select>
+      </label>
+      <label class="check"><input type="checkbox" id="dys"> Syllabes colorées en alternance (comme le fichier dys)</label>
+      <label class="f">Couleurs des syllabes et des lettres
+        <select id="palette">
+          <option value="br">Bleu / rouge</option>
+          <option value="bo">Bleu / orange (élève daltonien)</option>
+        </select>
+      </label>
+      <label class="check"><input type="checkbox" id="cd" checked> Compte à rebours 3-2-1</label>
+      <label class="check"><input type="checkbox" id="loop" checked> Reprendre la liste à la fin</label>
+      <p class="small" id="howto"></p>
+    </div>
+  </div>
+</div>
+
+<script>
+const SERIES=[];
+const DYS={};
+const BD=[];
+const PRESETS={}, COLOR_OF={}, GROUP={};
+const DEF_KEY=SERIES.length?'Vers le CE1 — syllabes et pseudo-mots':'Exemple';
+SERIES.forEach(x=>{
+  const one=x.t.split(' ').every(w=>w.length===1)?x.t:'';
+  if(x.s.length){ const k=x.t+' — syllabes et pseudo-mots'; PRESETS[k]=x.s; COLOR_OF[k]=one; GROUP[k]='syl'; }
+  if(x.f.length){ const k=x.t+' — fluence'; PRESETS[k]=x.f; COLOR_OF[k]=one; GROUP[k]='flu'; }
+});
+if(BD.length){
+PRESETS['b / d (mon Genially)']=BD;
+COLOR_OF['b / d (mon Genially)']='b d'; GROUP['b / d (mon Genially)']='autre';
+} else { PRESETS['Exemple']="ra li mo nu fé pa vi to lor mip fal tur dral flo bonu fimé larpo tivra".split(' '); COLOR_OF['Exemple']=''; GROUP['Exemple']='autre'; }
+PRESETS['Liste générée']=[]; GROUP['Liste générée']='autre';
+PRESETS['Ma liste']=[]; GROUP['Ma liste']='autre';
+const presetText=k=>(PRESETS[k]||[]).join('\n');
+const $ = id => document.getElementById(id);
+const stage=$('stage'), hint=$('hint'), list=$('list'), preset=$('preset');
+const store={get(k){try{return localStorage.getItem(k)}catch(e){return null}},set(k,v){try{localStorage.setItem(k,v)}catch(e){}}};
+const inFrame=(()=>{try{return window.self!==window.top}catch(e){return true}})();
+if(inFrame) document.querySelectorAll('.dl').forEach(b=>b.hidden=true); // téléchargements bloqués dans l'aperçu Claude
+
+/* --- Séries et listes enregistrées --- */
+let saved={}; try{ saved=JSON.parse(store.get('lc-saved')||'{}')||{} }catch(e){ saved={} }
+function persistSaved(){ store.set('lc-saved',JSON.stringify(saved)); }
+function fillPresets(sel){
+  preset.innerHTML='';
+  [['syl','CE1 · syllabes et pseudo-mots'],['flu','CE1 · fluence'],['autre','Autres']].forEach(([g,label])=>{
+    const ks=Object.keys(PRESETS).filter(k=>GROUP[k]===g); if(!ks.length) return;
+    const og=document.createElement('optgroup'); og.label=ks.length===Object.keys(PRESETS).length?'Séries':label;
+    ks.forEach(k=>og.appendChild(new Option(k,'p:'+k))); preset.appendChild(og); });
+  const names=Object.keys(saved).sort((a,b)=>a.localeCompare(b,'fr'));
+  if(names.length){ const g2=document.createElement('optgroup'); g2.label='Mes listes enregistrées';
+    names.forEach(n=>g2.appendChild(new Option('★ '+n,'s:'+n))); preset.appendChild(g2); }
+  if(sel && [...preset.options].some(o=>o.value===sel)) preset.value=sel;
+  $('delList').hidden=!preset.value.startsWith('s:');
+}
+function setPreset(v){ preset.value=v; $('delList').hidden=!v.startsWith('s:'); store.set('lc-preset',v); }
+function save(){ store.set('lc-list',list.value); store.set('lc-preset',preset.value); }
+const sp=store.get('lc-preset');
+const spOk = sp && ((sp.startsWith('p:')&&PRESETS[sp.slice(2)]) || sp.startsWith('s:'));
+fillPresets(spOk ? sp : 'p:'+DEF_KEY);
+list.value = spOk ? (store.get('lc-list') ?? presetText(DEF_KEY)) : presetText(DEF_KEY);
+if(!spOk) $('colorLetters').value='';
+preset.onchange=()=>{
+  const v=preset.value; $('delList').hidden=!v.startsWith('s:');
+  if(v==='p:Liste générée'){ generate(); reset(); return; }
+  if(v.startsWith('s:')){ list.value=saved[v.slice(2)]||''; $('saveName').value=v.slice(2); }
+  else if(v!=='p:Ma liste'){ const k=v.slice(2); list.value=presetText(k); if(COLOR_OF[k]!==undefined) $('colorLetters').value=COLOR_OF[k];
+    if(GROUP[k]==='flu'){ $('order').value='list'; saveSettings(); } }
+  save(); reset();
+};
+list.oninput=()=>{ const v=preset.value;
+  const ref=v.startsWith('s:')?saved[v.slice(2)]:presetText(v.slice(2));
+  if(list.value!==ref && v!=='p:Ma liste') setPreset('p:Ma liste'); save(); items=[]; };
+
+function saveNamed(name,text){
+  name=(name||'').trim(); if(!name) return 'Donne un nom à la liste.';
+  if(!text.trim()) return 'La liste est vide.';
+  saved[name]=text.trim(); persistSaved(); fillPresets('s:'+name);
+  list.value=saved[name]; save();
+  return `Liste « ${name} » enregistrée. Elle est dans « Série ».`;
+}
+$('saveList').onclick=()=>{ $('listMsg').textContent=saveNamed($('saveName').value,list.value); };
+let delArmed=false;
+$('delList').onclick=()=>{
+  const v=preset.value; if(!v.startsWith('s:')) return;
+  if(!delArmed){ delArmed=true; $('delList').textContent='Confirmer la suppression'; setTimeout(()=>{delArmed=false;$('delList').textContent='Supprimer cette liste'},4000); return; }
+  delete saved[v.slice(2)]; persistSaved(); delArmed=false; $('delList').textContent='Supprimer cette liste';
+  fillPresets('p:Ma liste'); setPreset('p:Ma liste'); save();
+};
+$('dlList').onclick=()=>{ const t=list.value.trim(); if(!t){ $('listMsg').textContent='La liste est vide.'; return; }
+  const b=new Blob([t+'\n'],{type:'text/plain;charset=utf-8'}), a=document.createElement('a');
+  a.href=URL.createObjectURL(b); a.download=(($('saveName').value||'liste').trim().replace(/[\\/:*?"<>|]/g,'-'))+'.txt';
+  document.body.appendChild(a); a.click(); a.remove(); $('listMsg').textContent='Fichier téléchargé. « Ouvrir un .txt » le recharge sur un autre ordinateur.'; };
+$('openFile').onclick=()=>$('fileIn').click();
+$('fileIn').onchange=e=>{ const f=e.target.files[0]; if(!f) return; const r=new FileReader();
+  r.onload=()=>{ list.value=String(r.result).split(/\r?\n/).filter(l=>!l.startsWith('#')).join(' ').trim(); setPreset('p:Ma liste');
+    $('saveName').value=f.name.replace(/\.txt$/i,''); save(); reset(); }; r.readAsText(f); e.target.value=''; };
+
+/* --- Réglages --- */
+const fmt=v=>(+v).toLocaleString('fr-FR',{maximumFractionDigits:1})+' s';
+function syncOut(){ $('oShow').value=fmt($('show').value); $('oGap').value=fmt($('gap').value);
+  $('oCross').value=fmt($('cross').value); $('oSize').value=$('size').value; }
+['show','gap','cross','size'].forEach(id=>$(id).addEventListener('input',syncOut)); syncOut();
+const SETTINGS=['boardBg','palette','dys','trigger','chrono','show','gap','cross','size','font','order','spread','cd','loop','colorLetters'];
+try{ const st=JSON.parse(store.get('lc-settings2')||'{}'); SETTINGS.forEach(id=>{ if(id in st){ const el=$(id); el.type==='checkbox'?el.checked=st[id]:el.value=st[id]; } }); syncOut(); }catch(e){}
+function saveSettings(){ const st={}; SETTINGS.forEach(id=>{const el=$(id); st[id]=el.type==='checkbox'?el.checked:el.value}); store.set('lc-settings2',JSON.stringify(st)); }
+SETTINGS.forEach(id=>$(id).addEventListener('change',()=>{ saveSettings(); if(['trigger','chrono'].includes(id)) { updateHowto(); if(phase==='idle'||phase==='over') reset(); } }));
+
+const DET=/^(un|une|le|la|les|l'|l’|des|du|de|d'|d’|au|aux|il|elle|ils|elles|on|je|j'|tu|nous|vous|se|s'|s’|ses|son|sa|mon|ma|mes|ton|ta|tes|être|est|ce|cet|cette|quelque|tout|toute)$/i;
+function parseText(t){
+  const out=[];
+  t.split(/[\n\t,;•=→\/\uf03d]+/).forEach(piece=>{
+    piece=piece.replace(/\s+/g,' ').trim(); if(!piece) return;
+    const w=piece.split(' ');
+    if(w.length>1 && DET.test(w[0].replace(/[’']$/,m=>m))) out.push(piece);      // « un chat », « des amis »
+    else if(w.length>1 && /[’']/.test(w[0]) && DET.test(w[0].split(/[’']/)[0]+"'")) out.push(piece);
+    else out.push(...w);
+  });
+  return out;
+}
+function parse(){ return parseText(list.value); }
+function shuffle(a){for(let i=a.length-1;i>0;i--){const j=Math.floor(Math.random()*(i+1));[a[i],a[j]]=[a[j],a[i]]}return a}
+/* --- Générateur de syllabes et pseudo-mots --- */
+const LIQ_L=['b','p','f','c','g','v'];
+const OBS=['b','p','f','c','g','v','t','d'];
+const BAD_FINAL=['n','m','t','s','x','z'];
+const pick=a=>a[Math.floor(Math.random()*a.length)];
+const words=s=>s.toLowerCase().split(/[\s,;]+/).filter(Boolean);
+const isVowel=g=>/^[aeiouyéèêàâ]/.test(g);
+const isSimple=v=>v.length===1;
+function fixCG(c,v){ // c/g + e, é, i se lisent [s]/[ʒ] : on garde la lecture dure
+  if((c==='c'||c==='g')&&/^[eéiy]/.test(v)) return c==='c'?'qu':'gu'; return c; }
+function genItem(t,struct,C,V){
+  const Vm=V.filter(v=>v!=='e').length?V.filter(v=>v!=='e'):['a'];
+  const Vs=V.filter(isSimple).length?V.filter(isSimple):['a','i','o'];
+  const Cf=C.filter(c=>!BAD_FINAL.includes(c)).length?C.filter(c=>!BAD_FINAL.includes(c)):['r','l'];
+  const tv=isVowel(t);
+  const liq=c=>LIQ_L.includes(c)&&Math.random()<.4?'l':'r';
+  const syl=(c,v)=>fixCG(c,v)+v;
+  switch(struct){
+    case 'CV': return tv?syl(pick(C),t):syl(t,pick(V));
+    case 'VC': if(tv&&!isSimple(t)) return syl(pick(C),t);
+      return tv?t+pick(Cf):pick(Vs.filter(v=>v!=='e').length?Vs.filter(v=>v!=='e'):['a'])+t;
+    case 'CVC':
+      if(tv) return isSimple(t)&&t!=='e'?syl(pick(C),t)+pick(Cf):syl(pick(C),t);
+      { const v=pick(Vs.filter(v=>v!=='e').length?Vs.filter(v=>v!=='e'):['a']);
+        return (BAD_FINAL.includes(t)||Math.random()<.65)?syl(t,v)+pick(Cf):syl(pick(C),v)+t; }
+    case 'CCV':
+      if(tv){ const o=C.filter(c=>OBS.includes(c)); const c=pick(o.length?o:['b','t']); return c+liq(c)+t; }
+      return OBS.includes(t)?t+liq(t)+pick(V):syl(t,pick(V));
+    default: { // M2 / M3
+      const n=struct==='M3'?3:2, k=Math.floor(Math.random()*n); let w='';
+      for(let i=0;i<n;i++){
+        let c=pick(C), v=pick(Vm);
+        if(i===k){ if(tv) v=t; else c=t; }
+        if(i>0&&c==='s') c='ss';
+        w+=syl(c,v);
+        // parfois une consonne fermante
+        if(isSimple(v)&&Math.random()<(i===n-1?.35:.2)) w+= i===n-1 ? pick(Cf) : pick(['r','l']);
+      }
+      return w.replace(/(.)\1\1/g,'$1$1');
+    }
+  }
+}
+function generate(){
+  const T=words($('gTargets').value), C0=words($('gCons').value), V0=words($('gVow').value);
+  const S=[...document.querySelectorAll('.structs input:checked')].map(i=>i.value);
+  if(!T.length||!S.length){ list.value=''; return; }
+  const C=C0.length?C0:['r','l','m','t'], V=V0.length?V0:['a','i','o','u'];
+  const n=+$('gNb').value, out=new Set(); let tries=0;
+  while(out.size<n&&tries<n*60){ tries++;
+    const t=T[out.size%T.length], w=genItem(t,pick(S),C,V);
+    if(w&&w.includes(t)) out.add(w); }
+  list.value=shuffle([...out]).join('\n');
+  setPreset('p:Liste générée');
+  if(T.every(t=>t.length===1)) $('colorLetters').value=T.join(' ');
+  save(); saveGen(); items=[];
+}
+function saveGen(){ store.set('lc-gen',JSON.stringify({t:$('gTargets').value,c:$('gCons').value,v:$('gVow').value,n:$('gNb').value,a:$('gAuto').checked,
+  s:[...document.querySelectorAll('.structs input')].map(i=>i.checked)})); }
+try{ const g=JSON.parse(store.get('lc-gen')||'null'); if(g){ $('gTargets').value=g.t; $('gCons').value=g.c; $('gVow').value=g.v; $('gNb').value=g.n; $('gAuto').checked=g.a;
+  document.querySelectorAll('.structs input').forEach((i,k)=>{ if(g.s&&k in g.s) i.checked=g.s[k]; }); } }catch(e){}
+const syncNb=()=>{$('oNb').value=$('gNb').value}; $('gNb').addEventListener('input',syncNb); syncNb();
+$('gen').onclick=()=>{ generate(); reset(); };
+['gTargets','gCons','gVow','gNb','gAuto'].forEach(id=>$(id).addEventListener('change',saveGen));
+document.querySelectorAll('.structs input').forEach(i=>i.addEventListener('change',saveGen));
+
+
+/* --- File d'attente --- */
+let items=[], idx=0;
+function buildQueue(){ if($('gAuto').checked && preset.value==='p:Liste générée') generate(); items=parse(); if($('order').value==='random') shuffle(items); idx=0; }
+function next(){ if(idx>=items.length){ if(!$('loop').checked) return null; const last=items[items.length-1]; buildQueue();
+  if(items.length>1&&items[0]===last){ items.push(items.shift()); } } return items[idx++]; }
+
+/* syllabe (1 groupe vocalique) ou pseudo-mot (2 et plus) */
+function nbSyl(w){ const k=w.replace(/\s+/g,' ').trim();
+  if(DYS[k]) return Math.max(1,DYS[k].split('|').filter(x=>/^[brvyp]/.test(x)).length);
+  let s=w.toLowerCase().replace(/[qg]u(?=[aeiouéè])/g,'q');
+  let n=(s.match(/[aeiouyéèêëàâîïôûù]+/g)||[]).length;
+  if(n>1 && /[^aeiouy]e$/.test(s)) n--; return Math.max(n,1); }
+
+/* découpage syllabique : celui du fichier dys quand il existe, sinon un découpage automatique */
+const VUNITS=['eau','oin','ain','ein','aim','ien','œu','ou','oi','au','ai','ei','eu','on','om','an','am','en','em','in','im','un','um','œ','y','a','e','é','è','ê','ë','i','î','ï','o','ô','u','û','ù','à','â'];
+const CUNITS=['ch','ph','gn','qu','gu','ç'];
+const isV=c=>/[aeiouyéèêëîïôûùàâœ]/i.test(c);
+function units(w){ const u=[]; let i=0, L=w.toLowerCase();
+  while(i<w.length){ let hit=null;
+    for(const v of VUNITS){ if(L.startsWith(v,i)){ const nx=L[i+v.length]||'';
+        if(/[nm]$/.test(v)&&v.length>1&&(isV(nx)||nx==='n'||nx==='m')) continue; hit=['V',v.length]; break; } }
+    if(!hit && L.startsWith('ge',i) && /[aoâô]/.test(L[i+2]||'')) hit=['C',2];   // pigeon, geai
+    if(!hit) for(const c of CUNITS){ if(L.startsWith(c,i)&&(c!=='gu'||isV(L[i+2]||''))){ hit=['C',c.length]; break; } }
+    if(!hit) hit=[isV(L[i])?'V':(/[a-zà-ÿ]/i.test(L[i])?'C':'X'),1];
+    u.push([hit[0],w.substr(i,hit[1])]); i+=hit[1]; }
+  return u; }
+function syllabify(w){ const u=units(w), out=[]; let cur='';
+  const vi=u.map((x,i)=>x[0]==='V'?i:-1).filter(i=>i>=0);
+  if(vi.length<2) return [w];
+  let start=0;
+  for(let k=0;k<vi.length-1;k++){
+    const a=vi[k], b=vi[k+1], cons=u.slice(a+1,b).map(x=>x[1]);
+    let cut;
+    if(cons.length===0) cut=b;
+    else if(cons.length===1) cut=b-1;
+    else { const last=cons[cons.length-1].toLowerCase(), prev=cons[cons.length-2].toLowerCase();
+      cut = (/^[rl]$/.test(last) && /^[bcdfgkptv]$/.test(prev) && prev!==last) ? b-2 : b-1; }
+    out.push(u.slice(start,cut).map(x=>x[1]).join('')); start=cut; }
+  out.push(u.slice(start).map(x=>x[1]).join(''));
+  if(out.length>1 && /^e?s?$/i.test(out[out.length-1]) && /[aeiouyéèê]$/i.test(out[out.length-2])) out[out.length-2]+=out.pop(); // année
+  return out.filter(Boolean); }
+function dysSegments(word){
+  const key=word.replace(/\s+/g,' ').trim();
+  if(DYS[key]) return DYS[key].split('|').map(s=>[s.slice(1),s[0]]);
+  const segs=[]; let alt=0;
+  key.split(' ').forEach((w,i)=>{ if(i) segs.push([' ','_']); syllabify(w).forEach(sy=>{ segs.push([sy,alt%2?'r':'b']); alt++; }); });
+  return segs; }
+
+function render(word){
+  const el=document.createElement('div'); el.className='item';
+  const f=$('font').value; if(f==='cursive') el.classList.add('cursive');
+  const up=t=>f==='upper'?t.toUpperCase():t;
+  if($('dys').checked){
+    dysSegments(word).forEach(([t,c])=>{ const s=document.createElement('span'); s.textContent=up(t); if(c!=='_') s.className='d-'+c; el.appendChild(s); });
+    el.style.fontSize=(stage.clientHeight*$('size').value/100)+'px';
+    return el;
+  }
+  const txt=up(word);
+  const letters=$('colorLetters').value.toLowerCase().split(/[\s,]+/).filter(Boolean);
+  for(const ch of txt){ const s=document.createElement('span'); s.textContent=ch;
+    const k=letters.indexOf(ch.toLowerCase()); if(k>-1) s.className='c'+(k%4); el.appendChild(s); }
+  el.style.fontSize=(stage.clientHeight*$('size').value/100)+'px';
+  return el;
+}
+function fit(el){ // jamais plus large que le tableau
+  const max=stage.clientWidth*0.94; if(el.offsetWidth>max) el.style.fontSize=(parseFloat(el.style.fontSize)*max/el.offsetWidth)+'px'; }
+
+/* --- Partie --- */
+let mode='flash', phase='idle'; // idle | countdown | play | paused | over
+let cur=null, nextT=null, cdT=null, tick=null, elapsed=0, lastTs=0, log=[], readCount=0, errCount=0, lastCell=-1;
+const isClick=()=>$('trigger').value==='click';
+const limit=()=>+$('chrono').value;
+
+function place(el){
+  stage.appendChild(el); fit(el);
+  if(!$('spread').checked){ el.style.left='50%'; el.style.top='52%'; return; }
+  let c; do{ c=Math.floor(Math.random()*9) }while(c===lastCell); lastCell=c;
+  const col=c%3,row=Math.floor(c/3);
+  const w=el.offsetWidth/stage.clientWidth*100, h=el.offsetHeight/stage.clientHeight*100;
+  let x=(col+0.5)*33.33+(Math.random()-0.5)*14, y=(row+0.5)*33.33+(Math.random()-0.5)*12;
+  x=Math.min(Math.max(x,w/2+3),97-w/2); y=Math.min(Math.max(y,h/2+12),96-h/2);
+  el.style.left=x+'%'; el.style.top=y+'%';
+}
+function present(){
+  if(phase!=='play') return;
+  const w=next(); if(w===null){ end(); return; }
+  const el=render(w); cur={el,w,read:false};
+  if(mode==='flash'){
+    el.classList.add('hide'); place(el);
+    requestAnimationFrame(()=>requestAnimationFrame(()=>el.classList.remove('hide')));
+    cur.t=setTimeout(expire,$('show').value*1000);
+  } else {
+    el.classList.add('scroll'); el.style.top='55%'; stage.appendChild(el); fit(el);
+    const W=stage.clientWidth, ew=el.offsetWidth;
+    cur.anim=el.animate([{transform:`translate(${W}px,-50%)`},{transform:`translate(${-ew}px,-50%)`}],
+      {duration:$('cross').value*1000,easing:'linear',fill:'forwards'});
+    cur.full=ew/(W+ew);   // part de la traversée après laquelle le mot est entièrement visible
+    cur.anim.onfinish=expire;
+  }
+}
+function retire(c,fast){
+  clearTimeout(c.t); const el=c.el;
+  if(c.anim){ if(fast){ c.anim.pause(); el.animate([{opacity:1},{opacity:0}],{duration:140,fill:'forwards'}).onfinish=()=>el.remove(); c.anim.onfinish=null; }
+              else el.remove(); }
+  else { el.classList.add('hide'); setTimeout(()=>el.remove(),200); }
+}
+function expire(){ // l'élément arrive au bout de son temps sans clic
+  if(!cur) return; const c=cur; cur=null;
+  log.push({w:c.w,read:!!c.read,err:!!c.err}); retire(c,false); schedule();
+}
+function schedule(){ clearTimeout(nextT); if(phase!=='play') return;
+  nextT=setTimeout(present, mode==='flash' ? $('gap').value*1000 : 150); }
+function hit(ok=true){ // clic gauche / Espace = lu correctement ; clic droit / X = erreur
+  if(!cur) return;
+  if(isClick()){
+    if(cur.anim && cur.full){ const t=cur.anim.currentTime||0, d=cur.anim.effect.getTiming().duration;
+      if(t/d < cur.full) return; }   // pas encore entré en entier : on attend
+    const c=cur; cur=null;
+    if(ok){ readCount++; } else { errCount++; }
+    log.push({w:c.w,read:ok,err:!ok}); retire(c,true); updateHud(); schedule(); }
+  else if(!cur.read && !cur.err){
+    if(ok){ cur.read=true; readCount++; cur.el.classList.add('ok'); }
+    else { cur.err=true; errCount++; cur.el.classList.add('bad'); }
+    updateHud(); }
+}
+
+function fmtTime(s){ s=Math.max(0,Math.ceil(s)); return Math.floor(s/60)+':'+String(s%60).padStart(2,'0'); }
+function updateHud(){
+  $('hudRead').textContent='✓ '+readCount+(errCount?'   ✗ '+errCount:''); $('readHead').textContent=readCount;
+  const L=limit(), t=$('hudTime');
+  if(L){ t.textContent=fmtTime(L-elapsed); t.classList.toggle('low',L-elapsed<=10); }
+  else t.textContent=fmtTime(elapsed);
+}
+function startClock(){ lastTs=performance.now(); clearInterval(tick);
+  tick=setInterval(()=>{ if(phase!=='play') return; const now=performance.now(); elapsed+=(now-lastTs)/1000; lastTs=now;
+    updateHud(); if(limit() && elapsed>=limit()) end(); },100); }
+
+function newGame(){
+  if(!parse().length && !(preset.value==='p:Liste générée' && $('gAuto').checked)){
+    hint.hidden=false; hint.innerHTML='<b>La liste est vide</b><span>Ajoute des syllabes ou des mots, ou utilise le générateur.</span>'; return; }
+  clearStage(); log=[]; readCount=0; errCount=0; elapsed=0; buildQueue(); $('results').hidden=true;
+  $('hud').hidden=false; updateHud(); setPlay('❚❚ Pause');
+  const go=()=>{ hint.hidden=true; phase='play'; startClock(); present(); };
+  if(!$('cd').checked){ go(); return; }
+  phase='countdown'; let n=3; hint.hidden=false; hint.innerHTML='<div class="countdown">3</div>';
+  const t=()=>{ n--; if(phase!=='countdown') return; if(n===0){ go(); return; } hint.firstChild.textContent=n; cdT=setTimeout(t,800); };
+  cdT=setTimeout(t,800);
+}
+function pause(){
+  if(phase!=='play') return; phase='paused'; clearTimeout(nextT);
+  if(cur){ if(cur.anim) cur.anim.pause(); else { clearTimeout(cur.t); } }
+  setPlay('▶ Reprendre'); hint.hidden=false; hint.innerHTML='<b>Pause</b><span>Clique ou appuie sur Espace pour reprendre</span>';
+}
+function resume(){
+  phase='play'; hint.hidden=true; setPlay('❚❚ Pause'); lastTs=performance.now();
+  if(cur){ if(cur.anim) cur.anim.play(); else cur.t=setTimeout(expire,$('show').value*1000); } else schedule();
+}
+function end(){
+  if(phase==='idle'||phase==='over') return;
+  if(phase==='countdown'){ clearTimeout(cdT); reset(); return; }
+  phase='over'; clearTimeout(nextT); clearInterval(tick);
+  if(cur){ retire(cur,true); cur=null; }
+  setPlay('▶ Relancer'); showScore();
+}
+function clearStage(){ clearTimeout(nextT); clearTimeout(cdT); if(cur){ clearTimeout(cur.t); if(cur.anim) cur.anim.cancel(); cur=null; }
+  stage.querySelectorAll('.item').forEach(e=>e.remove()); }
+function reset(){
+  phase='idle'; clearInterval(tick); clearStage(); items=[]; readCount=0; errCount=0; elapsed=0; log=[];
+  $('hud').hidden=true; $('readHead').textContent=0; setPlay('▶ Lancer'); $('results').hidden=true; idleHint();
+}
+function idleHint(){ hint.hidden=false;
+  const L=limit(), lab={30:'30 secondes',60:'1 minute',90:'1 minute 30',120:'2 minutes',180:'3 minutes'}[L], d=L?` Tu as ${lab}.`:'';
+  hint.innerHTML= isClick()
+    ? `<b>Clique ou appuie sur Espace pour commencer</b><span>Lis à voix haute : clic gauche si c'est juste, clic droit si c'est faux.${d}</span>`
+    : `<b>Clique ou appuie sur Espace pour commencer</b><span>Les syllabes arrivent toutes seules. Clique quand tu as lu.${d}</span>`; }
+function setPlay(t){ $('play').textContent=t; }
+
+/* --- Score --- */
+function durText(s){ s=Math.round(s); if(s<60) return s+' s'; const m=Math.floor(s/60), r=s%60; return m+' min'+(r?' '+String(r).padStart(2,'0'):''); }
+function showScore(){
+  const read=log.filter(e=>e.read), syl=read.filter(e=>nbSyl(e.w)===1).length, pm=read.length-syl;
+  const errs=log.filter(e=>e.err).length, missed=log.filter(e=>!e.read&&!e.err).length, dur=limit()&&elapsed>=limit()-0.05?limit():elapsed;
+  const perMin=dur>0?Math.round(read.length*60/dur):0;
+  const parts=[`${syl} d'une syllabe`,`${pm} de plusieurs syllabes`];
+  const pl=(n,a)=>n>1?a+'s':a;
+  let extra=` · ${errs} ${pl(errs,'erreur')}`;
+  if(isClick()){ if(missed) extra+=` · ${missed} ${pl(missed,'pas lu')} à temps`; } else extra+=` · ${log.length} ${pl(log.length,'affiché')}`;
+  hint.hidden=false;
+  hint.innerHTML=`<div class="score"><div class="big">${read.length}</div>
+    <div class="what">${pl(read.length,'lu')} correctement en ${durText(dur)}</div>
+    <div class="detail">${parts.join(' · ')}${extra}</div>
+    ${limit()?'':`<div class="detail">soit ${perMin} correctement lus par minute</div>`}
+    <div class="again">Nouvelle partie : bouton vert « ▶ Relancer »</div></div>`;
+  $('resSummary').textContent=`${read.length} ${pl(read.length,'lu')} correctement en ${durText(dur)} : ${parts.join(', ')}${extra.split(' · ').join(', ')}. Erreurs soulignées en rouge, éléments non lus barrés.`;
+  const chips=$('resChips'); chips.innerHTML='';
+  log.forEach(e=>{ const c=document.createElement('span'); c.className='chip'+(e.read?'':e.err?' err':' miss'); c.textContent=e.w; chips.appendChild(c); });
+  $('results').hidden=false;
+}
+/* --- Commandes --- */
+function primary(){ // clic sur le tableau ou Espace
+  if(phase==='over') return;          // le score reste affiché : seul le bouton Relancer relance
+  if(phase==='idle') newGame();
+  else if(phase==='paused') resume();
+  else if(phase==='play') hit();
+}
+$('play').onclick=()=>{ if(phase==='play') pause(); else if(phase==='paused') resume(); else if(phase!=='countdown') newGame(); };
+stage.onclick=primary;
+stage.addEventListener('contextmenu',e=>{ e.preventDefault(); if(phase==='play') hit(false); });   // clic droit = erreur
+$('finish').onclick=end;
+$('reset').onclick=reset;
+document.addEventListener('keydown',e=>{
+  if($('help').open) return;          // l'aide est ouverte : Échap la ferme, rien d'autre
+  if(e.target.matches('textarea,input,select')) return;
+  if(e.target.tagName==='BUTTON' && (e.code==='Space'||e.code==='Enter')) return;
+  if(e.code==='Space'||e.code==='Enter'||e.code==='ArrowRight'){ e.preventDefault(); primary(); }
+  if((e.key==='x'||e.key==='X'||e.code==='ArrowDown'||e.code==='Backspace') && phase==='play'){ e.preventDefault(); hit(false); }
+  if(e.key==='Escape'||e.key==='p'){ pause(); }
+});
+const board=$('board');
+/* --- Aide --- */
+$('helpBtn').onclick=()=>{ if(phase==='play') pause(); const d=$('help'); try{ d.showModal(); }catch(err){ d.setAttribute('open',''); } };
+$('helpClose').onclick=()=>{ const d=$('help'); try{ d.close(); }catch(err){ d.removeAttribute('open'); } };
+$('help').addEventListener('click',e=>{ if(e.target===$('help')) $('helpClose').click(); });   // clic hors du cadre
+document.querySelectorAll('.help-toc a').forEach(a=>a.addEventListener('click',e=>{ e.preventDefault();
+  const t=document.querySelector(a.getAttribute('href')); if(t) t.scrollIntoView({behavior:'smooth',block:'start'}); }));
+$('fs').onclick=()=>{ try{ const p=document.fullscreenElement?document.exitFullscreen():board.requestFullscreen(); p&&p.catch&&p.catch(()=>{}); }catch(e){} };
+document.addEventListener('fullscreenchange',()=>{ $('fs').textContent=document.fullscreenElement?'⛶ Quitter le plein écran':'⛶ Plein écran'; stage.focus(); });
+setInterval(()=>board.classList.toggle('playing',phase==='play'||phase==='countdown'),120);
+function applyBg(){ board.classList.toggle('light',$('boardBg').value==='light'); board.classList.toggle('cb',$('palette').value==='bo'); }
+window.addEventListener('blur',()=>pause());
+
+function updateHowto(){
+  $('lShow').firstChild.textContent = isClick()?"Temps d'affichage maximum ":"Temps d'affichage ";
+  $('howto').textContent = isClick()
+    ? "Au clic : clic gauche ou Espace = lu correctement ; clic droit ou X = erreur. La suivante arrive aussitôt. Si l'élève ne lit pas à temps, l'élément part seul et compte comme pas lu. Échap met en pause."
+    : "Automatique : les éléments défilent au rythme réglé. Clic gauche ou Espace = lu correctement ; clic droit ou X = erreur. Échap met en pause.";
+}
+function setMode(m){
+  mode=m; $('mFlash').setAttribute('aria-pressed',m==='flash'); $('mScroll').setAttribute('aria-pressed',m==='scroll');
+  document.querySelectorAll('.only-flash').forEach(e=>e.hidden=m!=='flash');
+  document.querySelectorAll('.only-scroll').forEach(e=>e.hidden=m!=='scroll');
+  $('subtitle').textContent=m==='flash'?'apparitions':'défilement';
+  store.set('lc-mode',m); reset();
+}
+$('mFlash').onclick=()=>setMode('flash'); $('mScroll').onclick=()=>setMode('scroll');
+['order','loop'].forEach(id=>$(id).addEventListener('change',()=>{items=[];}));
+updateHowto(); applyBg(); $('boardBg').addEventListener('change',applyBg); $('palette').addEventListener('change',applyBg);
+setMode(store.get('lc-mode')==='flash'?'flash':'scroll');
+</script>
+
+<script data-goatcounter="https://euryale.goatcounter.com/count" async src="//gc.zgo.at/count.js"></script>
+</body>
+</html>
