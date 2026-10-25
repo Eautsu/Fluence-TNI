@@ -4,7 +4,7 @@
 
 Des syllabes, des pseudo-mots ou des mots défilent ou apparaissent à l'écran, au rythme choisi par l'enseignant. Les élèves lisent à voix haute ; on valide chaque élément lu, juste ou faux ; un chrono et un score clôturent la partie.
 
-**▶ Utiliser l'outil : https://eautsu.github.io/fluence-tni/**
+**▶ Utiliser l'outil : [https://eautsu.github.io/fluence-TNI/]**
 
 Sans compte, sans installation, sans publicité. Une aide complète s'ouvre avec le bouton **? Aide**, en haut à droite de la page.
 
